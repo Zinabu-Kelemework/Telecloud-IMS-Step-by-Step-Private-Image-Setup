@@ -1,0 +1,150 @@
+Private Image creation Full steps
+
+using  .iso of ubuntu 25.04 (Plucky Puffin)
+
+local folder: C:\Users\zinabu.kelemwork\Desktop\ubuntu-zpaffin25.04.iso
+
+copy the file from local folder path to ecs
+
+step 1: upload the file from local machine to ecs
+
+> mkdir -p /var/lib/libvirt/{images,boot}
+
+// /var/lib/libvirt/{images,boot} is preferred when working with libvirt + qemu:
+
+> scp C:\Users\zinabu.kelemwork\Desktop\ubuntu-zpaffin25.04.iso root@196.190.220.38:/var/lib/libvirt/boot/
+
+step 2: preconfiguration: install tools(like qemu and virt)
+
+sudo apt update
+sudo apt install qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils virt-manager qemu-utils -y
+
+step3: verify installation 
+
+qemu-img --version
+virsh --version
+
+step 4:Create a blank qcow2 disk (20GB)
+
+> qemu-img create -f qcow2 /var/lib/libvirt/images/ubuntu-zpaffin25.04.qcow2 20G
+> chown libvirt-qemu:kvm /var/lib/libvirt/images/ubuntu-zpaffin25.04.qcow2
+> chmod 644 /var/lib/libvirt/images/ubuntu-zpaffin25.04.qcow2
+
+step 4: run Kvm accelerator commands 
+
+lsmod | grep kvm
+grep -E 'vmx|svm' /proc/cpuinfo | head
+
+step 5: Install Ubuntu using your ISO(virt-install command)
+
+sudo virt-install \
+  --name ubuntu-zpaffin2504 \
+  --ram 2048 \
+  --vcpus 2 \
+  --os-variant ubuntu24.04 \
+  --disk path=/var/lib/libvirt/images/ubuntu-zpaffin25.04.qcow2,format=qcow2,bus=virtio \
+  --location /var/lib/libvirt/boot/ubuntu-zpaffin25.04.iso,kernel=casper/vmlinuz,initrd=casper/initrd \
+  --network network=default \
+  --graphics none \
+  --console pty,target_type=serial \
+  --extra-args "console=ttyS0,115200n8" \
+  --noautoconsole
+
+ Step 6: Connect to the installer if it doesn’t attach automatically:
+
+> sudo virsh console ubuntu-zpaffin2504    //if not active activate with below command
+
+> sudo virsh start ubuntu-zpaffin2504
+> sudo virsh list --all
+
+connect again with 
+
+> sudo virsh console ubuntu-zpaffin2504
+
+
+  
+
+option 2: Option B — Keep --cdrom (GUI via VNC) for ubuntu installer
+
+> virsh destroy ubuntu-zpaffin2504 2>/dev/null || true
+> virsh undefine ubuntu-zpaffin2504 --nvram --managed-save --snapshots-metadata 2>/dev/null || true
+> lsof /var/lib/libvirt/images/ubuntu-zpaffin25.04.qcow2 2>/dev/null || true
+
+Here, let virt-install create the disk (no pre-create) and remove --extra-args:
+
+virsh net-start default 2>/dev/null || true
+
+virt-install \
+  --name ubuntu-zpaffin2504 \
+  --ram 1536 --vcpus 2 \
+  --os-variant ubuntu24.04 \
+  --disk path=/var/lib/libvirt/images/ubuntu-zpaffin25.04.qcow2,size=20,format=qcow2,bus=virtio \
+  --cdrom /var/lib/libvirt/boot/ubuntu-zpaffin25.04.iso \
+  --graphics vnc,listen=127.0.0.1 \
+  --network network=default
+
+//optional to get gust ip 
+sudo virsh domifaddr ubuntu-zpaffin2504
+then   ssh zed@gust ip from the host
+
+option 1 for Gust Vm preparation
+
+step 6: Prepare inside gust VM (after install completes)
+
+sudo apt update
+sudo apt -y install cloud-init qemu-guest-agent cloud-guest-utils
+sudo systemctl enable --now qemu-guest-agent
+sudo systemctl enable --now ssh
+
+// Generalize for imaging
+sudo rm -f /etc/ssh/ssh_host_*_key /etc/ssh/ssh_host_*_key.pub
+echo -n | sudo tee /etc/machine-id > /dev/null
+sudo ln -sf /etc/machine-id /var/lib/dbus/machine-id 2>/dev/null || true
+sudo cloud-init clean --logs
+sudo rm -rf /var/lib/cloud/*
+sudo shutdown -h now
+
+       OR use below command
+
+option 2 for VM preaparation
+ Prepare inside VM (after install completes)
+
+sudo apt update && sudo apt upgrade -y
+sudo apt install cloud-init -y
+sudo systemctl enable cloud-init  //optional
+sudo systemctl status cloud-init  //optional
+nana /etc/cloud/cloud.cfg.d/99-password-auth.cfg  // to enable password:  //optional
+  ssh_pwauth: true                       
+sudo apt clean
+sudo rm -rf /tmp/* /var/tmp/*
+sudo rm -f /etc/ssh/ssh_host_*
+sudo shutdown -h now
+
+step 7:Verify the qcow2 image   // Sanity check: on the host check if image exist
+
+ls -lh /var/lib/libvirt/images/ubuntu-zpaffin25.04.qcow2
+
+sudo qemu-img info /var/lib/libvirt/images/ubuntu-zpaffin25.04.qcow2
+
+step 8: download the ubuntu-zpaffin25.04.qcow2 from ecs to local machin
+
+> scp -C root@196.190.220.78:/var/lib/libvirt/images/ubuntu-zpaffin25.04.qcow2 C:\Users\zinabu.kelemwork\Desktop\
+
+step 9: Upload ubuntu-zpaffin25.04.qcow2 using multipart upload : for this pc invironmental set up needed.
+
+
+
+ to OBS → then 
+import it as a Private Image i  IMS.
+
+>obsutil
+
+> obsutil cp C:\Users\zinabu.kelemwork\Desktop\ubuntu-zpaffin25.04.qcow2 obs://z-bucket1/ubuntu-zpaffin25.04.qcow2 -f -ps=104857600 -p=4
+
+step 10: create the private image using the .qcow2 file from OBS by IMS service.
+step 11: create new ECS from the new private image
+
+congratulationson your successfull Deployment!!
+
+Zinabu Kelemework
+Thank you!
