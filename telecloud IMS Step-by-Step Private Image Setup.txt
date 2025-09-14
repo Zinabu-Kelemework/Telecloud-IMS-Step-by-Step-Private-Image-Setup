@@ -10,7 +10,7 @@ step 1: upload the file from local machine to ecs
 
 > mkdir -p /var/lib/libvirt/{images,boot}
 
-// /var/lib/libvirt/{images,boot} is preferred when working with libvirt + qemu:
+ /var/lib/libvirt/{images,boot} is preferred when working with libvirt + qemu:
 
 > scp C:\Users\zinabu.kelemwork\Desktop\ubuntu-zpaffin25.04.iso root@196.190.220.38:/var/lib/libvirt/boot/
 
